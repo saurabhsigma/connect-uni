@@ -3,7 +3,6 @@ import mongoose, { Schema, model, models } from "mongoose";
 const DirectMessageSchema = new Schema({
     content: {
         type: String,
-        required: true,
     },
     conversationId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -19,6 +18,21 @@ const DirectMessageSchema = new Schema({
     attachments: [{
         type: String // URLs
     }],
+    reactions: [{
+        emoji: String,
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+        },
+    }],
+    replyTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DirectMessage",
+    },
+    edited: {
+        type: Boolean,
+        default: false,
+    },
     deleted: {
         type: Boolean,
         default: false

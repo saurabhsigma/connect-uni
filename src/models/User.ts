@@ -6,6 +6,12 @@ const UserSchema = new Schema({
         required: [true, 'Please provide a name'],
         maxlength: [60, 'Name cannot be more than 60 characters'],
     },
+    username: {
+        type: String,
+        unique: true,
+        sparse: true,
+        lowercase: true,
+    },
     email: {
         type: String,
         required: [true, 'Please provide an email'],
@@ -13,7 +19,6 @@ const UserSchema = new Schema({
     },
     password: {
         type: String,
-        required: [true, 'Please provide a password'], // Only for credentials auth
         select: false,
     },
     image: {
@@ -32,6 +37,11 @@ const UserSchema = new Schema({
         type: String,
         maxlength: [200, 'Bio cannot be more than 200 characters'],
     },
+    status: {
+        type: String,
+        enum: ['online', 'offline', 'away'],
+        default: 'offline',
+    },
     courses: [{
         type: String,
     }],
@@ -43,6 +53,30 @@ const UserSchema = new Schema({
         github: String,
         twitter: String,
         instagram: String,
+    },
+    friends: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
+    followers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
+    following: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
+    blockedUsers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
+    servers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Server',
+    }],
+    lastSeen: {
+        type: Date,
+        default: Date.now,
     },
     createdAt: {
         type: Date,

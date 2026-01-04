@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { User, LogOut, Menu, X, Moon, Sun } from "lucide-react";
+import { User, LogOut, Menu, X, Moon, Sun, MessageSquare, Search } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 import Avatar from "./Avatar";
@@ -23,6 +23,7 @@ export function Navbar() {
         { name: "Events", href: "/events" },
         { name: "Hoodmaps", href: "/hoodmaps" },
         { name: "Community", href: "/community" },
+        { name: "Messages", href: "/messages" },
     ];
 
     return (

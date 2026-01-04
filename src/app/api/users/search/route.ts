@@ -24,10 +24,11 @@ export async function GET(req: Request) {
         const users = await User.find({
             _id: { $ne: session.user.id },
             $or: [
+                { username: { $regex: query, $options: "i" } },
                 { name: { $regex: query, $options: "i" } },
                 { email: { $regex: query, $options: "i" } }
             ]
-        }).select("name email image _id").limit(10);
+        }).select("name username email image bio status followers following createdAt _id").limit(20);
 
         return NextResponse.json(users);
 
