@@ -34,7 +34,7 @@ export default function MessagesPage() {
     const params = useParams();
     const router = useRouter();
     const { data: session } = useSession();
-    const { socket } = useSocket();
+    const { socket, onlineUsers } = useSocket();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -194,7 +194,7 @@ export default function MessagesPage() {
                     <div>
                         <h2 className="font-bold text-lg leading-tight">{getDisplayName()}</h2>
                         <p className="text-xs text-muted-foreground font-medium h-4">
-                            {otherUser?.status === 'online' ? (
+                            {otherUser && onlineUsers?.has(otherUser._id) ? (
                                 <span className="text-emerald-500">Active now</span>
                             ) : (
                                 "Offline"

@@ -2,13 +2,16 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail } from "lucide-react";
 
 export default function SignIn() {
     const router = useRouter();
-    const [email, setEmail] = useState("");
+    const searchParams = useSearchParams();
+    const prefilled = searchParams.get("username") || "";
+    const [identifier, setIdentifier] = useState(prefilled);
+    const registered = searchParams.get("registered") === "true";
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -20,7 +23,7 @@ export default function SignIn() {
 
         try {
             const res = await signIn("credentials", {
-                email,
+                identifier,
                 password,
                 redirect: false,
             });
@@ -59,18 +62,24 @@ export default function SignIn() {
                         </div>
                     )}
 
+                        {registered && (
+                            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-600 text-sm text-center">
+                                Account created. Your username: <strong className="text-foreground">{prefilled}</strong>
+                            </div>
+                        )}
+
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Email</label>
+                        <label className="text-sm font-medium text-foreground">Email or Username</label>
                         <div className="relative">
-                            <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 rounded-lg bg-input border border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
-                                placeholder="student@lpu.in"
-                                required
-                            />
+                                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 rounded-lg bg-input border border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
+                                    placeholder="student@lpu.in or username"
+                                    required
+                                />
                         </div>
                     </div>
 

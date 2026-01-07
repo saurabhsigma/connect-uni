@@ -9,6 +9,7 @@ export default function SignUp() {
     const router = useRouter();
     const [formData, setFormData] = useState({
         name: "",
+        username: "",
         email: "",
         password: "",
     });
@@ -35,8 +36,9 @@ export default function SignUp() {
                 return;
             }
 
-            // Automatically redirect to sign in or sign them in
-            router.push("/auth/signin?registered=true");
+            // Redirect to sign in and include assigned username if provided
+            const usernameQuery = data.username ? `&username=${encodeURIComponent(data.username)}` : "";
+            router.push(`/auth/signin?registered=true${usernameQuery}`);
         } catch (err) {
             setError("An error occurred");
             setLoading(false);
@@ -74,6 +76,21 @@ export default function SignUp() {
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 className="w-full pl-10 pr-4 py-2 rounded-lg bg-input border border-border text-foreground focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all placeholder:text-muted-foreground"
                                 placeholder="John Doe"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Username</label>
+                        <div className="relative">
+                            <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                            <input
+                                type="text"
+                                value={formData.username}
+                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                className="w-full pl-10 pr-4 py-2 rounded-lg bg-input border border-border text-foreground focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all placeholder:text-muted-foreground"
+                                placeholder="johndoe123"
                                 required
                             />
                         </div>
