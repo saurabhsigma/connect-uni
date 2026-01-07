@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MembersList from "@/components/server/MembersList";
 import InviteManager from "@/components/server/InviteManager";
 import { Settings, LogOut, X, Save, Trash2, Shield, UserMinus, Ban } from "lucide-react";
@@ -40,13 +40,13 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
 
     const handleDelete = async () => {
         if (!confirm("Are you sure you want to delete this server? This action cannot be undone.")) return;
-         try {
+        try {
             const res = await fetch(`/api/servers/${server._id}`, { method: "DELETE" });
             if (res.ok) router.push("/community");
             else alert("Failed to delete server");
         } catch (error) { console.error(error); }
     };
-    
+
     const handleLeave = async () => {
         if (!confirm("Are you sure you want to leave this server?")) return;
         try {
@@ -65,7 +65,7 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
                 {/* Sidebar */}
                 <div className="w-48 bg-secondary/10 border-r border-border p-4 flex flex-col gap-1">
                     <h2 className="font-bold text-sm uppercase text-muted-foreground mb-2 px-2">Settings</h2>
-                    {['overview', 'members', 'invites'].map(tab => (
+                    {['overview', 'members', 'invites', 'blocked'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -77,9 +77,9 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
                             {tab}
                         </button>
                     ))}
-                    
+
                     <div className="mt-auto pt-4 border-t border-border">
-                        <button 
+                        <button
                             onClick={handleLeave}
                             className="w-full text-left px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:bg-red-500/10 flex items-center gap-2"
                         >
@@ -87,7 +87,7 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
                         </button>
                     </div>
                 </div>
-                
+
                 {/* Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
                     <div className="flex justify-between items-center mb-6">
@@ -97,9 +97,9 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
 
                     {activeTab === 'overview' && (
                         <div className="space-y-6">
-                             <div className="space-y-2">
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Server Name</label>
-                                <input 
+                                <input
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="w-full bg-input border border-border rounded-md px-3 py-2 text-foreground outline-none focus:ring-1 focus:ring-primary"
@@ -107,24 +107,24 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Community Rules</label>
-                                <textarea 
+                                <textarea
                                     value={rules}
                                     onChange={(e) => setRules(e.target.value)}
                                     className="w-full h-32 bg-input border border-border rounded-md px-3 py-2 text-foreground outline-none focus:ring-1 focus:ring-primary resize-none"
                                     placeholder="Set guidelines for your community..."
                                 />
                             </div>
-                            <button 
+                            <button
                                 onClick={handleSave}
                                 disabled={saving}
                                 className="bg-primary text-primary-foreground px-6 py-2 rounded-md font-medium text-sm flex items-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition-colors"
                             >
                                 {saving ? "Saving..." : <><Save size={16} /> Save Changes</>}
                             </button>
-                            
+
                             <div className="pt-8 mt-8 border-t border-border">
                                 <h3 className="font-bold text-red-500 mb-2">Danger Zone</h3>
-                                <button 
+                                <button
                                     onClick={handleDelete}
                                     className="border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 transition-colors"
                                 >
@@ -136,9 +136,79 @@ export default function ServerSettingsModal({ server, onClose, onUpdate, canMana
 
                     {activeTab === 'members' && <MembersList serverId={server._id} canManage={canManage} isOwner={isOwner} />}
                     {activeTab === 'invites' && <InviteManager serverId={server._id} />}
+                    {activeTab === 'blocked' && <BlockedUsersList serverId={server._id} />}
 
                 </div>
             </div>
+        </div>
+    );
+}
+
+function BlockedUsersList({ serverId }: { serverId: string }) {
+    const [bans, setBans] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchBans();
+    }, [serverId]);
+
+    const fetchBans = async () => {
+        try {
+            const res = await fetch(`/api/servers/${serverId}/bans`);
+            if (res.ok) setBans(await res.json());
+        } catch (e) { console.error(e); }
+        finally { setLoading(false); }
+    };
+
+    const handleUnban = async (userId: string) => {
+        if (!confirm("Unblock this user?")) return;
+        try {
+            const res = await fetch(`/api/servers/${serverId}/bans/${userId}`, { method: "DELETE" });
+            if (res.ok) {
+                setBans(prev => prev.filter(b => b.userId._id !== userId));
+            } else {
+                alert("Failed to unblock");
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    if (loading) return <div className="text-center p-4 text-muted-foreground">Loading blocked users...</div>;
+
+    return (
+        <div className="space-y-4">
+            <h3 className="font-bold text-lg">Blocked Users</h3>
+            {bans.length === 0 ? (
+                <div className="text-center p-8 border border-dashed border-border rounded-xl text-muted-foreground">
+                    <Shield size={32} className="mx-auto mb-2 opacity-50" />
+                    <p>No blocked users.</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {bans.map((ban) => (
+                        <div key={ban._id} className="flex items-center justify-between p-3 bg-secondary/10 rounded-lg border border-border">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-secondary/20 overflow-hidden">
+                                    {ban.userId.image ? (
+                                        <img src={ban.userId.image} alt={ban.userId.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full font-bold">{ban.userId.name?.[0]}</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="font-bold">{ban.userId.name}</div>
+                                    <div className="text-xs text-muted-foreground">@{ban.userId.username} • {ban.reason || "No reason provided"}</div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => handleUnban(ban.userId._id)}
+                                className="text-red-500 hover:bg-red-500/10 px-3 py-1 rounded text-sm font-medium transition-colors"
+                            >
+                                Revoke
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

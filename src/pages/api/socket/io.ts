@@ -68,6 +68,22 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
                 }
             });
 
+            // Friend Request Events
+            socket.on("friend:request-sent", (data: { to: string }) => {
+                const targetSocketId = onlineUsers.get(data.to);
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit("friend:request-received");
+                    io.to(targetSocketId).emit("friend:update"); // Generic update trigger
+                }
+            });
+
+            socket.on("friend:respond", (data: { to: string, action: string }) => {
+                const targetSocketId = onlineUsers.get(data.to);
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit("friend:update"); // Refresh lists
+                }
+            });
+
             socket.on("disconnect", () => {
                 console.log("SERVER: Socket Disconnected:", socket.id);
                 // Find and remove the user who disconnected

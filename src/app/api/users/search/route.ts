@@ -30,7 +30,28 @@ export async function GET(req: Request) {
             ]
         }).select("name username email image bio status followers following createdAt _id").limit(20);
 
-        return NextResponse.json(users);
+        // Fetch current user to check friendship status
+        const currentUser = await User.findById(session.user.id).select('friends friendRequests');
+
+        const results = users.map((user: any) => {
+            let status = 'none'; // 'none', 'friend', 'sent', 'received'
+
+            if (currentUser.friends.includes(user._id)) {
+                status = 'friend';
+            } else {
+                const req = currentUser.friendRequests.find((r: any) => r.user.toString() === user._id.toString());
+                if (req) {
+                    status = req.type;
+                }
+            }
+
+            return {
+                ...user.toObject(),
+                friendshipStatus: status
+            };
+        });
+
+        return NextResponse.json(results);
 
     } catch (error) {
         console.error("USER_SEARCH_GET", error);

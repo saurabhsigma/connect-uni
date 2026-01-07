@@ -55,13 +55,13 @@ export async function POST(req: Request) {
                 name: "general",
                 type: "text",
                 serverId: server._id,
-                creatorId: session.user.id
+                userId: session.user.id
             },
             {
                 name: "General Voice",
                 type: "audio",
                 serverId: server._id,
-                creatorId: session.user.id
+                userId: session.user.id
             }
         ]);
 

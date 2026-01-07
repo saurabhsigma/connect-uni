@@ -58,6 +58,20 @@ const UserSchema = new Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     }],
+    friendRequests: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+        type: {
+            type: String,
+            enum: ['sent', 'received'],
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now,
+        }
+    }],
     followers: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

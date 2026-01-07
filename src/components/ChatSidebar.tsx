@@ -24,6 +24,7 @@ interface SearchResult {
     username: string;
     image?: string;
     bio?: string;
+    friendshipStatus: 'none' | 'friend' | 'sent' | 'received';
 }
 
 export default function ChatSidebar() {
@@ -67,8 +68,20 @@ export default function ChatSidebar() {
         };
 
         socket.on('new-message', handleNewMessage);
-        return () => socket.off('new-message', handleNewMessage);
-    }, [socket]);
+        socket.on('new-message', handleNewMessage);
+
+        // Listen for friend updates to refresh stats
+        const handleFriendUpdate = () => {
+            fetchConversations();
+            if (searchQuery) performSearch(searchQuery);
+        };
+        socket.on("friend:update", handleFriendUpdate);
+
+        return () => {
+            socket.off('new-message', handleNewMessage);
+            socket.off("friend:update", handleFriendUpdate);
+        };
+    }, [socket, searchQuery]);
 
     // Debounce Search
     useEffect(() => {
@@ -144,6 +157,18 @@ export default function ChatSidebar() {
         return null;
     };
 
+    const handleFriendAction = async (targetId: string, action: 'send' | 'accept' | 'reject' | 'cancel') => {
+        try {
+            await fetch("/api/friends/request", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ targetUserId: targetId, action })
+            });
+            // Re-search to update status
+            performSearch(searchQuery);
+        } catch (e) { console.error(e); }
+    };
+
     return (
         <div className="flex flex-col h-full bg-background border-r border-border">
             {/* Header */}
@@ -185,26 +210,48 @@ export default function ChatSidebar() {
                 <div className="flex-1 overflow-y-auto border-b border-border scrollbar-thin">
                     <div className="p-2 space-y-2">
                         {searchResults.map((user) => (
-                            <button
+                            <div
                                 key={user._id}
-                                onClick={() => startDirectChat(user._id)}
-                                className="w-full flex items-center gap-3 p-3 hover:bg-muted rounded-lg transition-colors text-left group"
+                                className="w-full flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors group"
                             >
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0 relative">
-                                    {user.image ? (
-                                        <img src={user.image} alt={user.name} className="w-full h-full rounded-full object-cover" />
-                                    ) : (
-                                        user.name[0]
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0 relative">
+                                        {user.image ? (
+                                            <img src={user.image} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                                        ) : (
+                                            user.name[0]
+                                        )}
+                                        {onlineUsers?.has(user._id) && (
+                                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></span>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-sm truncate">{user.name}</p>
+                                        <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex-shrink-0 ml-2">
+                                    {user.friendshipStatus === 'friend' && (
+                                        <button onClick={() => startDirectChat(user._id)} className="p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20" title="Message">
+                                            <MessageSquare size={16} />
+                                        </button>
                                     )}
-                                    {onlineUsers?.has(user._id) && (
-                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></span>
+                                    {user.friendshipStatus === 'none' && (
+                                        <button onClick={() => handleFriendAction(user._id, 'send')} className="p-2 bg-secondary text-foreground rounded-full hover:bg-secondary/80" title="Add Friend">
+                                            <Plus size={16} />
+                                        </button>
+                                    )}
+                                    {user.friendshipStatus === 'sent' && (
+                                        <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded-full">Sent</span>
+                                    )}
+                                    {user.friendshipStatus === 'received' && (
+                                        <button onClick={() => router.push('/friends')} className="text-xs text-primary px-2 py-1 bg-primary/10 rounded-full hover:bg-primary/20">
+                                            Respond
+                                        </button>
                                     )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{user.name}</p>
-                                    <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
-                                </div>
-                            </button>
+                            </div>
                         ))}
                     </div>
                 </div>

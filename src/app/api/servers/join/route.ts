@@ -24,6 +24,13 @@ export async function POST(req: Request) {
         const server = await Server.findById(serverId);
         if (!server) return NextResponse.json({ message: "Server not found" }, { status: 404 });
 
+        // Check if banned
+        const { ServerBan } = await import("@/models/ServerBan");
+        const banned = await ServerBan.findOne({ serverId, userId: session.user.id });
+        if (banned) {
+            return NextResponse.json({ message: "You are banned from this server" }, { status: 403 });
+        }
+
         // Check if already a member
         const existing = await ServerMember.findOne({ userId: session.user.id, serverId });
         if (existing) {

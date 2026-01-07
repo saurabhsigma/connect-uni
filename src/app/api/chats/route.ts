@@ -56,6 +56,34 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
+        // Check availability (Must be friends to start a NEW conversation)
+        // We allows existing conversations to continue? No, usually friend-only applies to new ones.
+        // But if they were friends, stared chat, then unfriended?
+        // Let's enforce: NEW conversations require friendship.
+        // Existing ones: we will allow lookup (below) but maybe not sending messages? 
+        // For now, let's just restrict creation/lookup of the channel if stricter.
+        // Actually, "startDirectChat" on frontend calls this. 
+
+        const currentUser = await User.findById(userId);
+        if (!currentUser.friends.includes(otherUserId)) {
+            // Allow if there is ALREADY a conversation? 
+            // If we want to block messaging non-friends completely, we should block here.
+            // But if we want to allow legacy chats, we should check if conv exists first.
+
+            // Let's check if conversation exists first.
+            const existingConv = await Conversation.findOne({
+                type: 'direct',
+                $or: [
+                    { memberOneId: userId, memberTwoId: otherUserId },
+                    { memberOneId: otherUserId, memberTwoId: userId }
+                ]
+            });
+
+            if (!existingConv) {
+                return NextResponse.json({ error: "You must be friends to start a conversation." }, { status: 403 });
+            }
+        }
+
         // Find or create conversation
         let conversation = await Conversation.findOne({
             type: 'direct',
