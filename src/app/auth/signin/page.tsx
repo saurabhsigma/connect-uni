@@ -1,17 +1,23 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail } from "lucide-react";
 
-import { Suspense } from "react";
+export default function SignIn() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+            <SignInContent />
+        </Suspense>
+    );
+}
 
 function SignInContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const prefilled = searchParams?.get("username") || "";
+    const prefilled = searchParams?.get("username") ?? "";
     const [identifier, setIdentifier] = useState(prefilled);
     const registered = searchParams?.get("registered") === "true";
     const [password, setPassword] = useState("");
