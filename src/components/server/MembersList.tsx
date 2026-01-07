@@ -114,16 +114,16 @@ export default function MembersList({ serverId, canManage, isOwner }: { serverId
                                 <button
                                     onClick={async () => {
                                         try {
-                                            const res = await fetch("/api/conversations", {
+                                            const res = await fetch("/api/chats", {
                                                 method: "POST",
                                                 headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({ remoteUserId: member.userId._id })
+                                                body: JSON.stringify({ memberId: member.userId._id })
                                             });
                                             if (res.ok) {
                                                 const conv = await res.json();
                                                 // Use window.location as useRouter might not be available/passed or we can just navigate
                                                 // Actually, MembersList is a client component, let's use useRouter if available or window.location
-                                                window.location.href = `/community/me/${conv._id}`;
+                                                window.location.href = `/messages/${conv._id}`;
                                             }
                                         } catch (e) { console.error(e); }
                                     }}

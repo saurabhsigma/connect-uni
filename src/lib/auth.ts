@@ -9,25 +9,27 @@ export const authOptions: NextAuthOptions = {
         CredentialsProvider({
             name: "Credentials",
             credentials: {
-                email: { label: "Email", type: "email" },
+                identifier: { label: "Email or Username", type: "text" },
                 password: { label: "Password", type: "password" },
             },
             async authorize(credentials) {
-                if (!credentials?.email || !credentials?.password) {
-                    throw new Error("Please enter an email and password");
+                if (!credentials?.identifier || !credentials?.password) {
+                    throw new Error("Please enter an email/username and password");
                 }
 
                 await dbConnect();
 
-                // Find user by email
-                // Explicitly selecting password since it has select: false in schema
-                const user = await User.findOne({ email: credentials.email }).select("+password");
+                const identifier = String(credentials.identifier).toLowerCase();
+
+                // Find user by email or username. Username is stored lowercase in schema.
+                const user = await User.findOne({
+                    $or: [{ email: identifier }, { username: identifier }],
+                }).select("+password");
 
                 if (!user) {
-                    throw new Error("No user found with this email");
+                    throw new Error("No user found with these credentials");
                 }
 
-                // Check if password matches
                 const isMatch = await bcrypt.compare(credentials.password, user.password);
 
                 if (!isMatch) {
