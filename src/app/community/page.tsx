@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { Compass, MessageSquare, Plus, Search, Users, Hash, Shield } from "lucide-react";
 import { ServerDiscoveryList } from "@/components/server/ServerDiscovery";
 import { useRouter } from "next/navigation";
+import CreateServerModal from "@/components/server/CreateServerModal";
+import JoinServerModal from "@/components/server/JoinServerModal";
 
 export default function CommunityPage() {
     const { data: session } = useSession();
@@ -16,6 +18,8 @@ export default function CommunityPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [searching, setSearching] = useState(false);
+    const [showCreateServerModal, setShowCreateServerModal] = useState(false);
+    const [showJoinServerModal, setShowJoinServerModal] = useState(false);
 
     useEffect(() => {
         if (session) {
@@ -38,30 +42,20 @@ export default function CommunityPage() {
         } catch (e) { console.error(e); }
     };
 
-    const handleCreateServer = async () => {
-        const name = prompt("Enter Server Name:");
-        if (!name) return;
 
-        const isPrivate = confirm("Make this server Private?\n(Private servers are NOT listed in the Discovery page).");
 
-        try {
-            const res = await fetch("/api/servers", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name,
-                    description: "A new community",
-                    icon: "",
-                    visibility: isPrivate ? "private" : "public"
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                router.push(`/community/${data.server._id}`);
-            }
-        } catch (error) {
-            alert("Failed to create server");
-        }
+    const handleServerCreated = (server: any) => {
+        setMyServers(prev => [...prev, server]); // Optimistic update
+        router.push(`/community/${server._id}`);
+        setShowCreateServerModal(false);
+    };
+
+    const handleServerJoined = (serverId: string) => {
+        // We can't easily optimistic update the server list here as we don't have the full server object
+        // But we will fetch lists on mount of the new page or force a refetch if we stay here
+        fetchMyServers();
+        router.push(`/community/${serverId}`);
+        setShowJoinServerModal(false);
     };
 
     useEffect(() => {
@@ -112,13 +106,13 @@ export default function CommunityPage() {
                     </div>
                     <div className="flex gap-3">
                         <button
-                            onClick={() => setShowSearch(true)}
-                            className="bg-card hover:bg-muted text-foreground px-4 py-2 rounded-xl border border-border/50 shadow-sm transition-all flex items-center gap-2"
+                            onClick={() => setShowJoinServerModal(true)}
+                            className="bg-secondary hover:bg-secondary/80 text-foreground px-4 py-2 rounded-xl border border-border/50 transition-all flex items-center gap-2"
                         >
-                            <MessageSquare size={18} className="text-purple-400" /> New Message
+                            <Compass size={18} /> Join with Code
                         </button>
                         <button
-                            onClick={handleCreateServer}
+                            onClick={() => setShowCreateServerModal(true)}
                             className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
                         >
                             <Plus size={18} /> Create Server
@@ -213,49 +207,18 @@ export default function CommunityPage() {
 
             </div>
 
-            {/* User Search / New Message Modal */}
-            {showSearch && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-24 p-4 animate-in fade-in duration-200">
-                    <div className="bg-background border border-border w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[600px] overflow-hidden animate-in slide-in-from-bottom-4 zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-border flex justify-between items-center bg-muted/20">
-                            <h3 className="font-bold">New Message</h3>
-                            <button onClick={() => setShowSearch(false)} className="text-muted-foreground hover:text-foreground w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted">✕</button>
-                        </div>
-                        <div className="p-4">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                                <input
-                                    className="w-full bg-secondary/50 border border-border/50 rounded-xl pl-10 pr-4 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all"
-                                    placeholder="Search people by name..."
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    autoFocus
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            {searching && <div className="text-sm text-center text-muted-foreground p-8">Searching...</div>}
-                            {!searching && searchResults.length === 0 && searchQuery.length >= 2 && (
-                                <div className="text-sm text-center text-muted-foreground p-8">No users found.</div>
-                            )}
-                            {searchResults.map(user => (
-                                <button
-                                    key={user._id}
-                                    onClick={() => startConversation(user._id)}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-secondary/20 rounded-xl text-left transition-all"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-                                        {user.image ? <img src={user.image} className="w-full h-full object-cover" /> : <span className="font-bold">{user.name[0]}</span>}
-                                    </div>
-                                    <div>
-                                        <div className="font-bold">{user.name}</div>
-                                        <div className="text-xs text-muted-foreground">{user.email}</div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+            {/* User Search removed - now handled in Friends page */}
+            {showCreateServerModal && (
+                <CreateServerModal
+                    onClose={() => setShowCreateServerModal(false)}
+                    onCreated={handleServerCreated}
+                />
+            )}
+            {showJoinServerModal && (
+                <JoinServerModal
+                    onClose={() => setShowJoinServerModal(false)}
+                    onJoined={handleServerJoined}
+                />
             )}
         </div>
     );
