@@ -24,13 +24,21 @@ export const config = {
 
 const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
     if (!res.socket.server.io) {
+        console.log("SERVER: Initializing Socket.io");
         const path = "/api/socket/io";
         const httpServer: NetServer = res.socket.server as any;
 
-        const io = new ServerIO(httpServer, {
-            path: path,
-            addTrailingSlash: false,
-        });
+        try {
+            const io = new ServerIO(httpServer, {
+                path: path,
+                addTrailingSlash: false,
+                cors: {
+                    origin: "*",
+                    methods: ["GET", "POST"]
+                },
+                transports: ["websocket", "polling"],
+                allowEIO3: true,
+            });
 
         // Store the io instance globally
         setIoInstance(io);
@@ -60,52 +68,53 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
                 console.log("[SIGNAL] join-room", { socketId: socket.id, roomId });
             });
 
-            socket.on("webrtc:join", ({ roomId, userId }: { roomId: string; userId: string }) => {
+            socket.on("webrtc:join", ({ roomId, userId }: { roomId: string; userId?: string }) => {
+                console.log("[WEBRTC] Join:", { socketId: socket.id, roomId, userId });
+                
                 socket.join(roomId);
-                socketUserMap.set(socket.id, userId);
+                if (userId) socketUserMap.set(socket.id, userId);
 
-                const peers = roomParticipants.get(roomId) || new Set<string>();
-                const existingPeers = Array.from(peers).filter((id) => id !== socket.id);
+                const participants = roomParticipants.get(roomId) || new Set<string>();
+                const existingPeers = Array.from(participants).filter((id) => id !== socket.id);
 
-                peers.add(socket.id);
-                roomParticipants.set(roomId, peers);
+                participants.add(socket.id);
+                roomParticipants.set(roomId, participants);
 
-                socket.emit("webrtc:peers", {
-                    peers: existingPeers.map((id) => ({ socketId: id, userId: socketUserMap.get(id) })),
-                });
-
-                socket.to(roomId).emit("webrtc:peer-joined", { socketId: socket.id, userId });
-                console.log(`[SIGNAL] webrtc:join roomId=${roomId} socket=${socket.id}. Total peers in room: ${peers.size}`);
-                console.log(`[SIGNAL] Current Room Participants:`, Array.from(roomParticipants.entries()).map(([k, v]) => `${k}: [${Array.from(v).join(', ')}]`));
+                // Send list of existing peers to the new joiner
+                socket.emit("webrtc:peers", { peers: existingPeers });
+                
+                // Notify existing peers about the new joiner
+                socket.to(roomId).emit("webrtc:peer-joined", { peerId: socket.id, userId });
+                
+                console.log("[WEBRTC] Room:", roomId, "- Peers:", participants.size);
             });
 
-            socket.on(
-                "webrtc:signal",
-                ({ to, type, description, candidate, userId }: { to: string; type: string; description?: any; candidate?: any; userId?: string }) => {
-                    const targetRoom = Array.from(roomParticipants.entries()).find(([_, peers]) => peers.has(to))?.[0];
-                    io.to(to).emit("webrtc:signal", {
-                        from: socket.id,
-                        type,
-                        description,
-                        candidate,
-                        userId,
-                    });
-                    console.log(`[SIGNAL] webrtc:signal from=${socket.id} to=${to} type=${type} room=${targetRoom}`);
-                }
-            );
+            socket.on("webrtc:signal", ({ to, offer, answer, candidate }: any) => {
+                console.log("[WEBRTC] Signal:", { from: socket.id, to, hasOffer: !!offer, hasAnswer: !!answer, hasCandidate: !!candidate });
+                
+                io.to(to).emit("webrtc:signal", {
+                    from: socket.id,
+                    offer,
+                    answer,
+                    candidate,
+                });
+            });
 
             socket.on("webrtc:leave", ({ roomId }: { roomId: string }) => {
-                const peers = roomParticipants.get(roomId);
-                if (peers) {
-                    peers.delete(socket.id);
-                    socket.to(roomId).emit("webrtc:peer-left", { socketId: socket.id });
-                    if (peers.size === 0) {
+                console.log("[WEBRTC] Leave:", { socketId: socket.id, roomId });
+                
+                const participants = roomParticipants.get(roomId);
+                if (participants) {
+                    participants.delete(socket.id);
+                    socket.to(roomId).emit("webrtc:peer-left", { peerId: socket.id });
+                    
+                    if (participants.size === 0) {
                         roomParticipants.delete(roomId);
                     }
                 }
+                
                 socket.leave(roomId);
                 socketUserMap.delete(socket.id);
-                console.log(`[SIGNAL] webrtc:leave roomId=${roomId} socket=${socket.id}. Remaining peers: ${peers?.size || 0}`);
             });
 
             socket.on("send-message", (message: any) => {
@@ -168,6 +177,10 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
         });
 
         res.socket.server.io = io;
+        console.log("SERVER: Socket.io initialized successfully");
+        } catch (error) {
+            console.error("SERVER: Failed to initialize Socket.io:", error);
+        }
     } else {
         console.log("SERVER: Socket.io already running");
     }

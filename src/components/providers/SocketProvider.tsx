@@ -39,7 +39,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Initialize the socket server via a fetch call to the API route
         const socketInit = async () => {
-            await fetch("/api/socket/io");
+            try {
+                await fetch("/api/socket/io");
+            } catch (error) {
+                console.log("Socket.io: Init fetch failed (this is normal):", error);
+            }
         };
         socketInit();
 
@@ -49,7 +53,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: Infinity,
+            timeout: 10000,
         });
 
         socketInstance.on("connect", () => {
@@ -63,11 +68,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         socketInstance.on("connect_error", (error: any) => {
-            console.error("Socket.io: Connection error:", error);
+            console.error("Socket.io: Connection error:", error.message);
         });
 
-        socketInstance.on("disconnect", () => {
-            console.log("Socket.io: Disconnected");
+        socketInstance.on("disconnect", (reason: string) => {
+            console.log("Socket.io: Disconnected -", reason);
             setIsConnected(false);
         });
 
