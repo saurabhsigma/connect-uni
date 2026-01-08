@@ -9,11 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.17",
+    "@livekit/components-styles": "^1.2.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "clsx": "^2.1.1",
     "emoji-picker-react": "^4.16.1",
     "framer-motion": "^12.23.26",
+    "livekit-client": "^2.16.1",
+    "livekit-server-sdk": "^2.15.0",
     "lucide-react": "^0.562.0",
     "mongoose": "^9.1.1",
     "multer": "^2.0.2",

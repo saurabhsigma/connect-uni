@@ -12,7 +12,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
-        const { lat, lng } = await req.json();
+        let lat, lng;
+        try {
+            const body = await req.text();
+            if (!body) {
+                return NextResponse.json({ message: "Missing body" }, { status: 400 });
+            }
+            const json = JSON.parse(body);
+            lat = json.lat;
+            lng = json.lng;
+        } catch (e) {
+            return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
+        }
 
         if (typeof lat !== 'number' || typeof lng !== 'number') {
             return NextResponse.json({ message: "Invalid coordinates" }, { status: 400 });

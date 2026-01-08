@@ -173,11 +173,12 @@ export default function ChatPage() {
     };
 
     // Render Voice/Video Room
+    // Render Voice/Video Room
     if (channel?.type === 'audio') {
-        return <MediaRoom channelId={channelId} video={false} />;
+        return <MediaRoom channelId={channelId} video={false} audio={true} />;
     }
     if (channel?.type === 'video') {
-        return <MediaRoom channelId={channelId} video={true} />;
+        return <MediaRoom channelId={channelId} video={true} audio={true} />;
     }
 
     // Render Text Chat
