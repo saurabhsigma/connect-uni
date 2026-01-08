@@ -1,0 +1,77 @@
+Project: LPU Connect (Discord + WhatsApp style community platform)
+
+Core Platform
+- Next.js 16 (App Router), TypeScript, React 19, TailwindCSS, Turbopack
+- Authentication via NextAuth (credentials), session-aware UI guards
+- MongoDB with Mongoose models for users, servers, channels, conversations, messages, events, products, locations, bans, invites, etc.
+- Socket.io real-time layer with reconnection/backoff and browser-friendly URL detection
+- Cloudinary uploads for images
+- REST APIs under /api with async params, error handling, and 401 protection
+
+Servers & Channels (Discord-like)
+- Create servers (public/private), invite management, server discovery
+- Text, voice, and video channels; quick channel creation modal
+- Server settings modal: rename, rules, danger zone delete, leave/transfer ownership
+- Roles: owner/admin checks for kick/ban/transfer
+- Rules acceptance gate on join with persistent rulesAccepted flag
+- Join/public endpoints with ban checks; leave endpoint prevents owners from leaving
+- Bans and kicks: admin/owner can kick (rejoin allowed) or ban (blocked from rejoin)
+- Blocked users list with unban; full ban reason tracking
+- Real-time member list: join/leave/kick/ban events update admin view instantly
+- Real-time user removal: kicked/banned user gets socket alert with server name and is redirected to /community immediately (no refresh)
+
+Messaging & Conversations (WhatsApp-style)
+- Direct and group conversations with member search and creation flow
+- Real-time messages via Socket.io with 3s polling fallback
+- Read receipts (readBy), typing indicators with TTL, reply-to, reactions, edited flag
+- Navigation fixes: clicking search results opens conversation; start chat from multiple entry points
+- Group creation modal with member selection and search
+- Message send form with attachments, emoji support (via existing UI), and scroll-to-bottom behavior
+
+Chat Sidebar & Search
+- User/conversation search with robust error handling and alerts
+- Simplified UX: direct "Message" button (friend requests removed)
+- Conversation list fetch with 401 handling; graceful empty states
+
+Profile & Social
+- Profile visibility gating (followers/following), blockedUsers, lastSeen/status
+- Editable profile with avatars (emoji sets) or image upload, bio, courses, interests, social links
+- Delete account flow with confirmation
+
+Events
+- Create, edit, delete events; RSVP endpoint and UI with attendee list
+- Event detail view with organizer info, share link, and admin controls
+
+Store
+- Product listings, detail, create/update flows; bidding endpoint; status updates
+
+Map / Location
+- Campus/hood maps, verified places/tags endpoints, location heartbeat API
+
+Community Discovery
+- Server discovery list, join-by-code modal, public servers endpoint
+
+Infrastructure & Error Handling
+- Central DB connection helper, auth options helper, permissions checks
+- Consistent fetch error handling with user-facing alerts; network error messaging
+- Build is clean (npm run build passes)
+
+Real-time Events (Socket)
+- user:online/offline tracking and broadcast
+- members: member:joined, member:left, member:kicked, member:banned
+- user-targeted: user:kicked, user:banned with server name and redirect instruction
+- typing, new-message events, friend update events (legacy)
+
+API Highlights (representative)
+- /api/servers: list/create, /public, /join, /leave, /[serverId], /[serverId]/channels, /invites, /members, /bans, /ban, /kick, /transfer, /rules/accept
+- /api/chats: conversations CRUD, messages CRUD, typing, read receipts
+- /api/users/search, /api/users/[userId]/profile, /follow
+- /api/events, /api/events/[id], /rsvp
+- /api/store, /api/store/[id], /bid
+- /api/hoodmaps, /api/verified-places, /api/verified-tags
+- /api/upload (Cloudinary)
+
+Current UX Guarantees
+- Kicked/banned users are instantly notified and redirected without refresh
+- Admin member/ban lists stay live-synced via sockets
+- All critical actions confirm and surface errors clearly
