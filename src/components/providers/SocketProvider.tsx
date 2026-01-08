@@ -37,16 +37,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
             ? undefined
             : (process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : ''));
 
-        // Initialize the socket server via a fetch call to the API route
-        const socketInit = async () => {
-            try {
-                await fetch("/api/socket/io");
-            } catch (error) {
-                console.log("Socket.io: Init fetch failed (this is normal):", error);
-            }
-        };
-        socketInit();
-
         const socketInstance = new (ClientIO as any)(socketUrl, {
             path: "/api/socket/io",
             addTrailingSlash: false,

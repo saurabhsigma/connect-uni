@@ -87,9 +87,16 @@ export default function MediaRoom({ channelId, video = false }: MediaRoomProps) 
     
     // WebRTC signaling
     useEffect(() => {
-        if (!socket || !localStream) return;
+        if (!socket) {
+            console.log("[WEBRTC] Socket not ready");
+            return;
+        }
+        if (!localStream) {
+            console.log("[WEBRTC] Local stream not ready");
+            return;
+        }
         
-        console.log("[ROOM] Joining room:", channelId);
+        console.log("[WEBRTC] Joining room:", channelId, "Socket:", socket.id);
         socket.emit("webrtc:join", { roomId: channelId, userId: session?.user?.id });
         
         // Create peer connection
