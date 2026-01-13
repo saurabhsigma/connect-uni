@@ -45,6 +45,7 @@ export default function ProductsManagementPage() {
       console.error("Error fetching store:", error);
     }
   };
+  
 
   const fetchProducts = async () => {
     try {

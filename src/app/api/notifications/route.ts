@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import Store from "@/models/Store";
+import Product from "@/models/Product";
 
 export async function GET(req: NextRequest) {
   try {
