@@ -34,6 +34,7 @@ export async function POST(req: Request) {
         // Find user ID (session might not have id directly if not customised, safely get it)
         const user = await User.findOne({ email: session.user.email }).select('_id');
         if (!user) {
+            console.error("User not found for email:", session.user.email);
             return NextResponse.json({ message: "User not found" }, { status: 404 });
         }
 
@@ -51,7 +52,14 @@ export async function POST(req: Request) {
 
     } catch (error) {
         console.error("Location heartbeat error:", error);
-        return NextResponse.json({ message: "Internal Error" }, { status: 500 });
+        if (error instanceof Error) {
+            console.error("Error message:", error.message);
+            console.error("Error stack:", error.stack);
+        }
+        return NextResponse.json({ 
+            message: "Internal Error", 
+            error: error instanceof Error ? error.message : String(error) 
+        }, { status: 500 });
     }
 }
 export async function DELETE(req: Request) {

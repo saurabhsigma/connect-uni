@@ -6,6 +6,11 @@ const ProductSchema = new Schema({
         ref: 'User',
         required: true,
     },
+    storeId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Store',
+        required: false,
+    },
     title: {
         type: String,
         required: [true, 'Please provide a title'],
@@ -19,13 +24,31 @@ const ProductSchema = new Schema({
         type: Number,
         required: [true, 'Please provide a price'],
     },
+    offerPrice: {
+        type: Number,
+        default: null,
+    },
     category: {
         type: String,
         required: [true, 'Please provide a category'],
-        enum: ['Textbooks', 'Electronics', 'Furniture', 'Clothing', 'Stationery', 'Other'],
     },
+    productType: {
+        type: String,
+        enum: ['Physical', 'Digital', 'Service', 'Rental'],
+        default: 'Physical',
+    },
+    images: [{
+        type: String,
+    }],
     image: {
-        type: String, // URL to image
+        type: String, // Backward compatibility
+    },
+    tags: [{
+        type: String,
+    }],
+    stock: {
+        type: Number,
+        default: 1,
     },
     status: {
         type: String,
