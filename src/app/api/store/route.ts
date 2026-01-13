@@ -28,7 +28,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
-        const { title, description, price, category, image } = await req.json();
+        const { title, description, price, category, image, storeId, productType, tags, stock } = await req.json();
 
         if (!title || !description || !price || !category) {
             return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
@@ -38,16 +38,27 @@ export async function POST(req: Request) {
 
         const product = await Product.create({
             sellerId: session.user.id,
+            storeId: storeId || null,
             title,
             description,
             price,
             category,
             image,
+            productType: productType || "Physical",
+            tags: tags || [],
+            stock: stock || 1,
         });
 
         return NextResponse.json(product, { status: 201 });
     } catch (error) {
         console.error("Products POST error:", error);
-        return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+        if (error instanceof Error) {
+            console.error("Error message:", error.message);
+            console.error("Error stack:", error.stack);
+        }
+        return NextResponse.json(
+            { message: "Internal server error", error: error instanceof Error ? error.message : String(error) },
+            { status: 500 }
+        );
     }
 }

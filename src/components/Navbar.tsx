@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { User, LogOut, Menu, X, Moon, Sun, MessageSquare, Search } from "lucide-react";
+import { User, LogOut, Menu, X, Moon, Sun, MessageSquare, Search, Store } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 import Avatar from "./Avatar";
 import { useTheme } from "./ThemeProvider";
+import NotificationBell from "./NotificationBell";
 
 export function Navbar() {
     const { data: session } = useSession();
@@ -83,6 +84,14 @@ export function Navbar() {
                                         ADMIN
                                     </Link>
                                 )}
+                                <NotificationBell />
+                                <Link
+                                    href="/store/my-store"
+                                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                                    title="My Store"
+                                >
+                                    <Store size={18} />
+                                </Link>
                                 <Link
                                     href="/profile"
                                     className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
@@ -156,6 +165,14 @@ export function Navbar() {
                         <hr className="border-border" />
                         {session ? (
                             <>
+                                <Link
+                                    href="/store/my-store"
+                                    onClick={() => setIsOpen(false)}
+                                    className="flex items-center gap-2 py-2 text-muted-foreground hover:text-primary"
+                                >
+                                    <Store size={18} />
+                                    My Store
+                                </Link>
                                 <Link
                                     href="/profile"
                                     onClick={() => setIsOpen(false)}

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import User from "@/models/User";
+import Store from "@/models/Store";
 
 export async function GET(
     req: Request,
@@ -57,21 +58,32 @@ export async function PUT(
             return NextResponse.json({ message: "Product not found" }, { status: 404 });
         }
 
-        // Check if user is admin or product seller
+        // Check if user is admin, product seller, or store owner (handles legacy products without storeId)
         const isAdmin = session.user.role === 'admin' || session.user.role === 'moderator';
         const isSeller = product.sellerId.toString() === session.user.id;
 
-        if (!isAdmin && !isSeller) {
-            return NextResponse.json({ message: "Forbidden: Only admin or seller can edit" }, { status: 403 });
+        // Fetch store owned by this user (if any) and compare to product.storeId
+        const ownedStore = await Store.findOne({ ownerId: session.user.id }).select('_id');
+        const ownsProductStore = ownedStore && product.storeId && product.storeId.toString() === ownedStore._id.toString();
+        const ownsAnyStoreForLegacyProduct = ownedStore && !product.storeId; // allow owners to clean up legacy products
+        const isStoreOwner = Boolean(ownsProductStore || ownsAnyStoreForLegacyProduct);
+
+        if (!isAdmin && !isSeller && !isStoreOwner) {
+            return NextResponse.json({ message: "Forbidden: Only admin, seller, or store owner can edit" }, { status: 403 });
         }
 
-        const { title, description, price, category, image, status } = await req.json();
+        const { title, description, price, offerPrice, category, image, images, tags, stock, productType, status } = await req.json();
 
         if (title) product.title = title;
         if (description) product.description = description;
-        if (price) product.price = price;
+        if (price !== undefined) product.price = price;
+        if (offerPrice !== undefined) product.offerPrice = offerPrice;
         if (category) product.category = category;
         if (image !== undefined) product.image = image;
+        if (images && images.length > 0) product.images = images;
+        if (tags && tags.length > 0) product.tags = tags;
+        if (stock !== undefined) product.stock = stock;
+        if (productType) product.productType = productType;
         if (status) product.status = status;
 
         await product.save();
@@ -103,12 +115,18 @@ export async function DELETE(
             return NextResponse.json({ message: "Product not found" }, { status: 404 });
         }
 
-        // Check if user is admin or product seller
+        // Check if user is admin, product seller, or store owner (handles legacy products without storeId)
         const isAdmin = session.user.role === 'admin' || session.user.role === 'moderator';
         const isSeller = product.sellerId.toString() === session.user.id;
 
-        if (!isAdmin && !isSeller) {
-            return NextResponse.json({ message: "Forbidden: Only admin or seller can delete" }, { status: 403 });
+        // Fetch store owned by this user (if any) and compare to product.storeId
+        const ownedStore = await Store.findOne({ ownerId: session.user.id }).select('_id');
+        const ownsProductStore = ownedStore && product.storeId && product.storeId.toString() === ownedStore._id.toString();
+        const ownsAnyStoreForLegacyProduct = ownedStore && !product.storeId; // allow owners to clean up legacy products
+        const isStoreOwner = Boolean(ownsProductStore || ownsAnyStoreForLegacyProduct);
+
+        if (!isAdmin && !isSeller && !isStoreOwner) {
+            return NextResponse.json({ message: "Forbidden: Only admin, seller, or store owner can delete" }, { status: 403 });
         }
 
         await Product.findByIdAndDelete(id);
