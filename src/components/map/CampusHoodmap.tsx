@@ -4,7 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Popup, Circle } from "react-leaflet";
 import L from "leaflet";
 import { CampusTag, CATEGORIES, LPU_BOUNDS, TagCategory } from "@/lib/campusConfig";
-import { ThumbsUp, ThumbsDown, X } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MapPin, Loader } from "lucide-react";
+import { useSocket } from "@/components/providers/SocketProvider";
+import { useSession } from "next-auth/react";
+
+interface UserLocation {
+    userId: string;
+    lat: number;
+    lng: number;
+}
+
+interface HeatmapPoint {
+    lat: number;
+    lng: number;
+    intensity: number; // 0-1
+}
 
 export function CampusHoodmap() {
     const [tags, setTags] = useState<CampusTag[]>([]);
@@ -13,11 +27,138 @@ export function CampusHoodmap() {
     const [addingTag, setAddingTag] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
     const [tagText, setTagText] = useState("");
+    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+    const [locationLoading, setLocationLoading] = useState(true);
+    const [onlineUsers, setOnlineUsers] = useState<UserLocation[]>([]);
+    const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
     const mapRef = useRef<L.Map>(null);
+    const { socket } = useSocket();
+    const { data: session } = useSession();
+    const heatmapLayerRef = useRef<L.Layer | null>(null);
 
     useEffect(() => {
         fetchTags();
+        getUserLocation();
     }, []);
+
+    const getUserLocation = () => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    setUserLocation([latitude, longitude]);
+                    setLocationLoading(false);
+                    
+                    // Send user location to server for heatmap
+                    if (session?.user?.id) {
+                        sendLocationToServer(latitude, longitude);
+                    }
+                },
+                (error) => {
+                    console.warn("Geolocation error:", error);
+                    // Set default LPU center if geolocation fails
+                    setUserLocation([LPU_BOUNDS.center[0], LPU_BOUNDS.center[1]]);
+                    setLocationLoading(false);
+                }
+            );
+        } else {
+            setUserLocation([LPU_BOUNDS.center[0], LPU_BOUNDS.center[1]]);
+            setLocationLoading(false);
+        }
+    };
+
+    const sendLocationToServer = async (lat: number, lng: number) => {
+        try {
+            if (!session?.user?.id) return;
+            
+            await fetch("/api/user-locations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: session.user.id,
+                    lat,
+                    lng,
+                }),
+            });
+        } catch (error) {
+            console.error("Error sending location to server:", error);
+        }
+    };
+
+    // Fetch user locations for heatmap
+    useEffect(() => {
+        const fetchUserLocations = async () => {
+            try {
+                const res = await fetch("/api/user-locations");
+                if (res.ok) {
+                    const data = await res.json();
+                    // Convert API format to local format
+                    const locations: UserLocation[] = data.map((loc: any) => ({
+                        userId: loc.userId,
+                        lat: loc.location.coordinates[1],
+                        lng: loc.location.coordinates[0],
+                    }));
+                    setOnlineUsers(locations);
+                    generateHeatmapData(locations);
+                }
+            } catch (error) {
+                console.error("Error fetching user locations:", error);
+            }
+        };
+
+        // Fetch immediately and then every 10 seconds
+        fetchUserLocations();
+        const interval = setInterval(fetchUserLocations, 10000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const generateHeatmapData = (userLocations: UserLocation[]) => {
+        if (userLocations.length === 0) {
+            setHeatmapData([]);
+            return;
+        }
+
+        // Create grid-based heatmap with adaptive grid size
+        const gridSize = 0.0015; // ~160m cells (adjusted for better density visualization)
+        const density = new Map<string, { count: number; lats: number[]; lngs: number[] }>();
+
+        // Count users in each grid cell
+        userLocations.forEach(user => {
+            const gridX = Math.floor(user.lat / gridSize);
+            const gridY = Math.floor(user.lng / gridSize);
+            const gridKey = `${gridX},${gridY}`;
+            
+            if (!density.has(gridKey)) {
+                density.set(gridKey, { count: 0, lats: [], lngs: [] });
+            }
+            
+            const cell = density.get(gridKey)!;
+            cell.count += 1;
+            cell.lats.push(user.lat);
+            cell.lngs.push(user.lng);
+        });
+
+        // Find max density for normalization
+        const maxDensity = Math.max(...Array.from(density.values()).map(v => v.count));
+
+        // Convert grid to heatmap points with averaged center
+        const points: HeatmapPoint[] = Array.from(density.entries())
+            .filter(([_, cell]) => cell.count > 0)
+            .map(([key, cell]) => {
+                const avgLat = cell.lats.reduce((a, b) => a + b, 0) / cell.lats.length;
+                const avgLng = cell.lngs.reduce((a, b) => a + b, 0) / cell.lngs.length;
+                
+                return {
+                    lat: avgLat,
+                    lng: avgLng,
+                    intensity: Math.min(1, cell.count / Math.max(1, maxDensity * 0.5)), // Scale to 0-1
+                };
+            });
+
+        setHeatmapData(points);
+    };
+
 
     const fetchTags = async () => {
         try {
@@ -104,6 +245,14 @@ export function CampusHoodmap() {
         return cat?.icon || "📍";
     };
 
+    const getHeatmapColor = (intensity: number): string => {
+        // Red for high density (>0.7), yellow for medium (0.4-0.7), green for low (<0.4)
+        if (intensity > 0.7) return "#ef4444"; // Red
+        if (intensity > 0.4) return "#fbbf24"; // Yellow
+        if (intensity > 0) return "#10b981"; // Green
+        return "transparent"; // No users
+    };
+
     const getScore = (tag: CampusTag) => tag.upvotes - tag.downvotes;
 
     const getOpacity = (score: number) => {
@@ -121,8 +270,22 @@ export function CampusHoodmap() {
             {/* Header */}
             <div className="p-4 border-b border-border bg-background/80 backdrop-blur">
                 <div className="max-w-7xl mx-auto">
-                    <h1 className="text-2xl font-bold mb-2">Campus Hoodmaps</h1>
-                    <p className="text-muted-foreground text-sm">Click on map to add tags, vote on existing ones</p>
+                    <div className="flex items-center justify-between mb-2">
+                        <h1 className="text-2xl font-bold">Campus Hoodmaps</h1>
+                        {userLocation && !locationLoading && (
+                            <div className="flex items-center gap-2 text-sm text-green-400">
+                                <MapPin size={16} />
+                                <span>Location enabled</span>
+                            </div>
+                        )}
+                        {locationLoading && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Loader size={16} className="animate-spin" />
+                                <span>Finding location...</span>
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-muted-foreground text-sm">Click on map to add tags, vote on existing ones. See online users heatmap.</p>
                     
                     {/* Action Buttons */}
                     <div className="flex gap-2 mt-4 flex-wrap">
@@ -190,7 +353,7 @@ export function CampusHoodmap() {
                     </div>
                 ) : (
                     <MapContainer
-                        center={[LPU_BOUNDS.center[0], LPU_BOUNDS.center[1]]}
+                        center={userLocation || [LPU_BOUNDS.center[0], LPU_BOUNDS.center[1]]}
                         zoom={16}
                         style={{ width: "100%", height: "100%" }}
                         ref={mapRef}
@@ -199,6 +362,46 @@ export function CampusHoodmap() {
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         />
+
+                        {/* Heatmap Layer - User Density */}
+                        {heatmapData.map((point, idx) => (
+                            <Circle
+                                key={`heatmap-${idx}`}
+                                center={[point.lat, point.lng]}
+                                radius={250} // Larger radius for better visualization
+                                pathOptions={{
+                                    color: getHeatmapColor(point.intensity),
+                                    fill: true,
+                                    fillOpacity: Math.pow(point.intensity, 0.6) * 0.5, // Improved opacity curve
+                                    weight: 1,
+                                    fillColor: getHeatmapColor(point.intensity),
+                                }}
+                            />
+                        ))}
+
+                        {/* User's current location */}
+                        {userLocation && (
+                            <Circle
+                                center={userLocation}
+                                radius={20}
+                                pathOptions={{
+                                    color: "#3b82f6",
+                                    fill: true,
+                                    fillOpacity: 0.8,
+                                    weight: 2,
+                                    dashArray: "5, 5",
+                                }}
+                            >
+                                <Popup>
+                                    <div className="p-2 text-sm">
+                                        <p className="font-bold">Your Location</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}
+                                        </p>
+                                    </div>
+                                </Popup>
+                            </Circle>
+                        )}
 
                         {/* Campus boundary (visual reference) */}
                         <Circle
@@ -281,14 +484,42 @@ export function CampusHoodmap() {
             {/* Legend */}
             <div className="p-4 border-t border-border bg-background/80 backdrop-blur">
                 <div className="max-w-7xl mx-auto">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">CATEGORIES</p>
-                    <div className="flex flex-wrap gap-3">
-                        {CATEGORIES.map(cat => (
-                            <div key={cat.name} className="flex items-center gap-2 text-xs">
-                                <span className="text-lg">{cat.icon}</span>
-                                <span className="text-muted-foreground">{cat.name}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Categories */}
+                        <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-2">CATEGORY TAGS</p>
+                            <div className="flex flex-wrap gap-3">
+                                {CATEGORIES.map(cat => (
+                                    <div key={cat.name} className="flex items-center gap-2 text-xs">
+                                        <span className="text-lg">{cat.icon}</span>
+                                        <span className="text-muted-foreground">{cat.name}</span>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </div>
+
+                        {/* Heatmap Legend */}
+                        <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-2">USER DENSITY HEATMAP</p>
+                            <div className="flex flex-wrap gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full bg-red-500/60"></div>
+                                    <span className="text-xs text-muted-foreground">High Density</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full bg-yellow-500/60"></div>
+                                    <span className="text-xs text-muted-foreground">Medium Density</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full bg-green-500/60"></div>
+                                    <span className="text-xs text-muted-foreground">Low Density</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full border border-border"></div>
+                                    <span className="text-xs text-muted-foreground">Your Location</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
