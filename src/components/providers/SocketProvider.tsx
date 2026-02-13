@@ -66,7 +66,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         socketInstance.on("connect_error", (error: any) => {
-            console.error("Socket.io: Connection error:", error.message);
+            console.log("Socket.io: Connection attempt...", error.message);
         });
 
         socketInstance.on("disconnect", (reason: string) => {
