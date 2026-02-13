@@ -1,6 +1,36 @@
-import mongoose, { Schema, model, models } from 'mongoose';
+import mongoose, { Schema, model, models, Document } from 'mongoose';
 
-const OrderSchema = new Schema({
+// Ensure referenced models are loaded
+import './User';
+import './Store';
+import './Product';
+
+interface IOrder extends Document {
+    buyerId: mongoose.Types.ObjectId;
+    storeId: mongoose.Types.ObjectId;
+    productId: mongoose.Types.ObjectId;
+    productTitle: string;
+    productPrice: number;
+    quantity: number;
+    paymentMethod: string;
+    status: string;
+    address: {
+        name: string;
+        phone: string;
+        line1: string;
+        line2?: string;
+        city: string;
+        state: string;
+        postalCode: string;
+    };
+    note?: string;
+    buyerNotified: boolean;
+    sellerNotified: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+const OrderSchema = new Schema<IOrder>({
     buyerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true },
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -25,4 +55,5 @@ const OrderSchema = new Schema({
     updatedAt: { type: Date, default: Date.now },
 });
 
-export default models.Order || model('Order', OrderSchema);
+const Order = models.Order || model<IOrder>('Order', OrderSchema);
+export default Order;

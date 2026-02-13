@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Calendar, MapPin, Users, Clock, ArrowLeft, Edit, Trash2, Share2, User } from "lucide-react";
+import { Calendar, MapPin, Users, Clock, ArrowLeft, Edit, Trash2, Share2, User, Ticket, QrCode, IndianRupee, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import ImageUpload from "@/components/ImageUpload";
 
@@ -15,6 +15,11 @@ interface Event {
     time: string;
     location: string;
     image?: string;
+    eventType?: 'free' | 'paid';
+    ticketPrice?: number;
+    maxAttendees?: number;
+    registeredCount?: number;
+    category?: string;
     organizerId: {
         _id: string;
         name: string;
@@ -35,6 +40,8 @@ export default function EventDetailPage() {
     const [event, setEvent] = useState<Event | null>(null);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
+    const [purchasingTicket, setPurchasingTicket] = useState(false);
+    const [userTicket, setUserTicket] = useState<any>(null);
     const [formData, setFormData] = useState({
         title: "",
         description: "",
@@ -47,8 +54,11 @@ export default function EventDetailPage() {
     useEffect(() => {
         if (params?.id) {
             fetchEvent();
+            if (session?.user?.id) {
+                checkUserTicket();
+            }
         }
-    }, [params?.id]);
+    }, [params?.id, session]);
 
     const fetchEvent = async () => {
         try {
@@ -71,6 +81,48 @@ export default function EventDetailPage() {
             console.error("Error fetching event:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const checkUserTicket = async () => {
+        try {
+            const res = await fetch(`/api/tickets?eventId=${params?.id}`);
+            if (res.ok) {
+                const tickets = await res.json();
+                if (tickets.length > 0) {
+                    setUserTicket(tickets[0]);
+                }
+            }
+        } catch (error) {
+            console.error("Error checking ticket:", error);
+        }
+    };
+
+    const handleGetTicket = async () => {
+        if (!session || !event) return;
+
+        setPurchasingTicket(true);
+        try {
+            const res = await fetch("/api/tickets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ eventId: event._id }),
+            });
+
+            if (res.ok) {
+                const ticket = await res.json();
+                setUserTicket(ticket);
+                fetchEvent(); // Refresh to update registered count
+                alert("Ticket generated successfully! Check My Tickets page.");
+            } else {
+                const error = await res.json();
+                alert(error.message || "Failed to get ticket");
+            }
+        } catch (error) {
+            console.error("Ticket purchase error:", error);
+            alert("Failed to get ticket");
+        } finally {
+            setPurchasingTicket(false);
         }
     };
 
@@ -139,6 +191,8 @@ export default function EventDetailPage() {
     const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'moderator';
     const isOrganizer = session?.user?.id === event.organizerId?._id;
     const canEdit = isAdmin || isOrganizer;
+    const isSoldOut = event.maxAttendees && event.registeredCount && event.registeredCount >= event.maxAttendees;
+    const hasTicket = !!userTicket;
 
     return (
         <div className="min-h-screen bg-background p-4 md:p-8">
@@ -306,6 +360,104 @@ export default function EventDetailPage() {
                                 <div className="prose prose-invert max-w-none mb-8">
                                     <h2 className="text-xl font-semibold mb-3">About this event</h2>
                                     <p className="text-muted-foreground whitespace-pre-wrap">{event.description}</p>
+                                </div>
+
+                                {/* Ticket Info Card */}
+                                <div className="mb-6 p-6 glass-card rounded-xl border border-border/50">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                                            <Ticket className="text-primary" size={20} />
+                                            Ticket Information
+                                        </h3>
+                                        {event.eventType === 'paid' && (
+                                            <div className="flex items-center gap-1 text-2xl font-bold text-primary">
+                                                <IndianRupee size={20} />
+                                                {event.ticketPrice}
+                                            </div>
+                                        )}
+                                        {event.eventType === 'free' && (
+                                            <span className="px-4 py-1 bg-green-500/10 text-green-500 rounded-full font-semibold">FREE</span>
+                                        )}
+                                    </div>
+
+                                    {event.maxAttendees && (
+                                        <div className="mb-4">
+                                            <div className="flex justify-between text-sm mb-2">
+                                                <span className="text-muted-foreground">Tickets Claimed</span>
+                                                <span className="font-semibold">
+                                                    {event.registeredCount || 0} / {event.maxAttendees}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                                <div
+                                                    className="bg-primary h-full transition-all"
+                                                    style={{ width: `${((event.registeredCount || 0) / event.maxAttendees) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {hasTicket ? (
+                                        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <CheckCircle className="text-green-500" size={24} />
+                                                <div>
+                                                    <p className="font-semibold text-green-600">You have a ticket!</p>
+                                                    <p className="text-sm text-muted-foreground">Ticket Code: {userTicket.ticketCode}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Link
+                                                    href="/tickets"
+                                                    className="flex-1 py-2 rounded-lg bg-green-500 text-white font-semibold hover:bg-green-600 transition-colors text-center"
+                                                >
+                                                    View My Tickets
+                                                </Link>
+                                                {isOrganizer && (
+                                                    <Link
+                                                        href={`/events/${event._id}/scan`}
+                                                        className="flex-1 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 transition-colors text-center flex items-center justify-center gap-2"
+                                                    >
+                                                        <QrCode size={16} />
+                                                        Scan Tickets
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={handleGetTicket}
+                                            disabled={!session || purchasingTicket || isSoldOut}
+                                            className={`w-full py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                                                isSoldOut
+                                                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                                    : !session
+                                                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                                    : "bg-primary text-white hover:bg-primary/90 shadow-lg"
+                                            }`}
+                                        >
+                                            <Ticket size={18} />
+                                            {!session
+                                                ? "Sign in to Get Ticket"
+                                                : purchasingTicket
+                                                ? "Generating Ticket..."
+                                                : isSoldOut
+                                                ? "Sold Out"
+                                                : event.eventType === 'paid'
+                                                ? `Get Ticket - ₹${event.ticketPrice}`
+                                                : "Get Free Ticket"}
+                                        </button>
+                                    )}
+
+                                    {isOrganizer && !hasTicket && (
+                                        <Link
+                                            href={`/events/${event._id}/scan`}
+                                            className="mt-3 w-full py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-center font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <QrCode size={16} />
+                                            Scan Tickets (Organizer)
+                                        </Link>
+                                    )}
                                 </div>
 
                                 <button

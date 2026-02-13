@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { User, LogOut, Menu, X, Moon, Sun, MessageSquare, Search, Store } from "lucide-react";
+import { User, LogOut, Menu, X, Moon, Sun, MessageSquare, Search, Store, Ticket } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 import Avatar from "./Avatar";
@@ -15,6 +15,7 @@ export function Navbar() {
     const pathname = usePathname();
     const [showToast, setShowToast] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
     const { theme, toggleTheme } = useTheme();
 
     // Hide navbar on auth pages
@@ -85,31 +86,71 @@ export function Navbar() {
                                     </Link>
                                 )}
                                 <NotificationBell />
-                                <Link
-                                    href="/store/my-store"
-                                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-                                    title="My Store"
-                                >
-                                    <Store size={18} />
-                                </Link>
-                                <Link
-                                    href="/profile"
-                                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-                                >
-                                    <Avatar
-                                        avatarId={session.user?.avatar}
-                                        name={session.user?.name || undefined}
-                                        imageUrl={session.user?.image}
-                                        size="sm"
-                                    />
-                                    <span>{session.user?.name}</span>
-                                </Link>
-                                <button
-                                    onClick={() => signOut({ callbackUrl: '/' })}
-                                    className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-muted-foreground"
-                                >
-                                    <LogOut size={18} />
-                                </button>
+                                
+                                {/* Profile Dropdown */}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                        onBlur={() => setTimeout(() => setShowProfileMenu(false), 200)}
+                                        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                                    >
+                                        <Avatar
+                                            avatarId={session.user?.avatar}
+                                            name={session.user?.name || undefined}
+                                            imageUrl={session.user?.image}
+                                            size="sm"
+                                        />
+                                        <span>{session.user?.name}</span>
+                                    </button>
+
+                                    {/* Dropdown Menu */}
+                                    {showProfileMenu && (
+                                        <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl border border-border/50 shadow-xl overflow-hidden z-50">
+                                            <div className="p-3 border-b border-border/50">
+                                                <p className="text-sm font-semibold">{session.user?.name}</p>
+                                                <p className="text-xs text-muted-foreground">{session.user?.email}</p>
+                                            </div>
+                                            <div className="py-2">
+                                                <Link
+                                                    href="/profile"
+                                                    onClick={() => setShowProfileMenu(false)}
+                                                    className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                                >
+                                                    <User size={16} className="text-primary" />
+                                                    <span>My Profile</span>
+                                                </Link>
+                                                <Link
+                                                    href="/tickets"
+                                                    onClick={() => setShowProfileMenu(false)}
+                                                    className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                                >
+                                                    <Ticket size={16} className="text-green-500" />
+                                                    <span>My Tickets</span>
+                                                </Link>
+                                                <Link
+                                                    href="/store/my-store"
+                                                    onClick={() => setShowProfileMenu(false)}
+                                                    className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                                >
+                                                    <Store size={16} className="text-blue-500" />
+                                                    <span>My Store</span>
+                                                </Link>
+                                            </div>
+                                            <div className="border-t border-border/50">
+                                                <button
+                                                    onClick={() => {
+                                                        setShowProfileMenu(false);
+                                                        signOut({ callbackUrl: '/' });
+                                                    }}
+                                                    className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-red-500/10 text-red-500 transition-colors w-full"
+                                                >
+                                                    <LogOut size={16} />
+                                                    <span>Sign Out</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         ) : (
                             <div className="flex items-center gap-3">
